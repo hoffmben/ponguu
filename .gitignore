@@ -1,0 +1,14 @@
+venv
+__pycache__
+.pytest_cache
+*.egg-info
+flask_session
+*.db
+data
+.env
+pwfile
+pub_test.sh
+*.log
+*.terragrunt-cache
+.terraform.lock.hcl
+*.tar.gz

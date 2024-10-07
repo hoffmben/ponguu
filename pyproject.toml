@@ -1,0 +1,9 @@
+[project]
+name = "pongu"
+version = "0.0.1"
+dependencies = [
+    "paho-mqtt==2.1.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
