@@ -5,6 +5,7 @@ import logging
 import json
 import atexit
 import uuid
+import base64
 
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler()
@@ -12,7 +13,6 @@ handler = logging.StreamHandler()
 log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 handler.setFormatter(log_formatter)
 logger.addHandler(handler)
-logger.setLevel(logging.INFO)
 
 
 def get_ip_address():
@@ -79,18 +79,22 @@ class PongU:
 
     def __close_connection(self):
         logger.info("Closing connection")
-        self.mqtt_client.loop_stop()
         self.mqtt_client.disconnect()
 
 
     def recv_message(self, client, userdata, message):
 
         logger.info("Received message callback triggered.")
-        payload = str(message.payload.decode("utf-8"))
+
+        try:
+            payload = base64.b64decode(message.payload)
+            payload = json.loads(payload.decode('utf-8'))
+        except Exception as e:
+            logger.error("Failed to parse Message: %s", e)
         logger.info(f"Received message: {payload}")
 
         if payload:
-            userdata['messages'][message.topic] = json.loads(message.payload)
+            userdata['messages'][message.topic] = payload
 
 
     def on_connect(self, client, userdata, flags, rc, properties):
@@ -99,8 +103,9 @@ class PongU:
 
             ip_address = get_ip_address()
 
-            message = {'nick': self.nick, 'ip_address': ip_address, 'time': int(time.time())}
-            client.publish("user_logs", json.dumps(message))
+            json_bytes = json.dumps({'nick': self.nick, 'ip_address': ip_address, 'time': int(time.time())}).encode('utf-8')
+            base64_encoded_data = base64.b64encode(json_bytes)
+            client.publish("user_logs", base64_encoded_data)
             client.subscribe([("class/recv", 1)])
         else:
             logger.error(f"Connection failed with result code {rc}")
@@ -109,11 +114,16 @@ class PongU:
     def publish_messages(self, message, topic="class/resp"):
         logger.info("Sending Message!")
         logger.info(f"Message:\n{message}")
-        info = self.mqtt_client.publish(topic, json.dumps({'nick': self.nick, 'message': message, 'sent_time': int(time.time())}), qos=1, retain=True)
+
+        json_bytes = json.dumps({'nick': self.nick, 'message': message, 'sent_time': int(time.time())}).encode('utf-8')
+        base64_encoded_data = base64.b64encode(json_bytes)
+
+        info = self.mqtt_client.publish(topic, base64_encoded_data, qos=1, retain=True)
         info.wait_for_publish()
 
 
     def collect_messages(self, topic="class/recv"):
+        self.mqtt_client.subscribe([(topic, 1)])
         self.mqtt_client.message_callback_add(topic, self.recv_message)
         time.sleep(3)
         return self.mqtt_client._userdata['messages']
