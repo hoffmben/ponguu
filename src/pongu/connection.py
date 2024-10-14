@@ -6,6 +6,7 @@ import json
 import atexit
 import uuid
 import base64
+import re
 
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler()
@@ -42,7 +43,11 @@ class PongU:
             srvr_port (int, optional): broker port number. Defaults to 1883.
         """
 
-        self.nick = nick
+        if self.validate_mosquitto_client_name(nick):
+            self.nick = nick
+        else:
+            raise ValueError('Invalid Nick Valid Characters: a-zA-Z0-9-_+.~')
+
         unique_id = str(uuid.uuid4())
         client_id = f"{self.nick}_{unique_id}"
 
@@ -70,6 +75,13 @@ class PongU:
         logger.info("Opening connection")
         self.mqtt_client.connect(self.srvr_location, self.srvr_port)
         self.mqtt_client.loop_start()
+
+
+    def validate_mosquitto_client_name(self, nick):
+        pattern = r'^[a-zA-Z0-9\-_+.~]{1,23}$'
+        if re.match(pattern, nick):
+            return True
+        return False
 
 
     def client_connect(self):
